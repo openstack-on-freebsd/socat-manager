@@ -1,0 +1,66 @@
+#!/usr/bin/env python3.9
+# -*- coding: utf-8 -*-
+
+import logging
+import socket
+import sys
+import xml.etree.ElementTree as ET
+
+def main():
+    logging.basicConfig(filename='/tmp/socat.log', encoding='utf-8', level=logging.DEBUG)
+    domain = sys.argv[1]
+
+    # TODO: Domain XML should be retrieved from the STDIN rather than a file.
+    # But libvirtd does not send the XML through STDIN by now. This is just a workaround.
+    xml_path = "/usr/local/etc/libvirt/bhyve/{}.xml".format(domain)
+    tree = ET.parse(xml_path)
+    root = tree.getroot()
+
+    if sys.argv[2:4] == ["started", "begin"]:
+        action = "ADD"
+        for serial in root.iterfind("./devices/serial[@type='nmdm']"):
+            source = serial.find('source')
+            device = source.get('slave')
+            logging.info("domain: {}, device: {}".format(sys.argv[1], device))
+
+        for serial in root.iterfind("./devices/serial[@type='tcp']"):
+            source = serial.find('source')
+            port = source.get('service')
+            logging.info("domain: {}, port: {}".format(sys.argv[1], port))
+
+        send_request(action, device, port)
+
+    elif sys.argv[2:4] == ["stopped", "end"]:
+        action = "DEL"
+        for serial in root.iterfind("./devices/serial[@type='nmdm']"):
+            source = serial.find('source')
+            device = source.get('slave')
+            logging.info("domain: {}, device: {}".format(sys.argv[1], device))
+
+        for serial in root.iterfind("./devices/serial[@type='tcp']"):
+            source = serial.find('source')
+            port = source.get('service')
+            logging.info("domain: {}, port: {}".format(sys.argv[1], port))
+
+        send_request(action, device, port)
+
+
+def send_request(action, device, port):
+    client_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        client_socket.connect("/tmp/socket_service.sock")
+
+        request = f"{action} {device} {port}"
+        client_socket.send(request.encode())
+
+        response = client_socket.recv(1024).decode()
+        print(response)
+
+    except ConnectionError:
+        print("Something went wrong.")
+
+    finally:
+        client_socket.close()
+
+if __name__ == "__main__":
+    main()
