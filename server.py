@@ -13,12 +13,11 @@ PID_FILE = "socat_pid.txt"
 
 def create_socat_process(device, port):
     # Construct the socat command
+    # Example: /usr/local/bin/socat file:/dev/nmdm21B,ispeed=9600,ospeed=9600,raw,echo=0 tcp-listen:10014,bind=0.0.0.0,reuseaddr,fork
     socat_cmd = [
-        "socat",
-        "-d",
-        "-d",
-        f"TCP-LISTEN:{port},fork,reuseaddr",
-        f"EXEC:'cat {device}',pty,raw,echo=0"
+        "/usr/local/bin/socat",
+        f"FILE:{device},ispeed=9600,ospeed=9600,raw,echo=0",
+        f"TCP-LISTEN:{port},bind=0.0.0.0,fork,reuseaddr"
     ]
     
     # Use subprocess to run socat in the background
